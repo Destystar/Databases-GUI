@@ -1,0 +1,571 @@
+import psycopg2
+from tkinter import *
+import tkinter as tk
+from pathlib import Path
+import customtkinter as ctk
+from tkinter import messagebox
+from dotenv import load_dotenv
+import os
+
+# Load ENV with logging (ENV must be called database.env)
+script_dir = Path(__file__).parent.absolute()
+print(f"Script directory: {script_dir}")
+dotenv_path = script_dir / 'database.env'
+print(f"Looking for .env file at: {dotenv_path}")
+
+if dotenv_path.exists():
+    print("Found .env file, loading environment variables...")
+    load_dotenv(dotenv_path)
+else:
+    print("Error: .env file not found!")
+    raise FileNotFoundError(f".env file not found at {dotenv_path}")
+
+
+#%% Database connection and execution
+# Connect to database
+def connect():
+    host = os.getenv("HOST")
+    dbname = os.getenv("DB_NAME")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASSWORD")
+    connStr = f"host={host} dbname={dbname} user={user} password={password}"
+    
+    connection = psycopg2.connect(connStr)         
+    return connection
+
+# Execute the command input
+def executeCommand(command, returnType=False, *params):
+    connection = None
+    try:
+        connection = connect()
+        cur = connection.cursor()  
+        cur.execute('set search_path to cmps_db')
+        
+        # Execute command with parameters
+        if params:
+            cur.execute(command, params)
+        else:
+            cur.execute(command)
+            
+        if returnType:
+            rows = cur.fetchall()
+            return rows
+        
+        return None
+            
+    except Exception as e:
+        print(e)
+        raise e
+        
+    finally:
+        if connection:
+            connection.close()
+#%% 
+
+#%% GUI Management Functions
+    
+# Command to define the options of the second dropdown
+def getCommands(commandType):
+    commands = {
+        "Student Management": ["Add Student", "Delete Student", "Search Student By Email/ID/Name"],
+        "Exam Management": ["Add New Exam", "Delete Exam", "View Exam Schedule", "Search Exam By Title/Code"],
+        "Entry Management": ["Create Entry", "Cancel Entry", "Update Grade", "View Entries"]
+    }
+    return commands.get(commandType, [""])
+
+# Command to change the values of the second dropdown
+def updateCommandOptions(value):
+    specificCommand.set("Select Command")
+    newOptions = getCommands(value)
+    specificCommand.configure(values=[""])
+    if newOptions:
+        specificCommand.configure(values=newOptions)
+        
+# Function to open a popup for futher command functionality
+def selectedCommand():
+    selectedType = commandTypeSelect.get()
+    selectedCommand = specificCommand.get()
+    
+    if not selectedCommand or selectedCommand == "Select Command":
+       messagebox.showerror("Error", "Please select a valid command!")
+       return
+    
+    # Create the popup
+    popup = ctk.CTkToplevel(App)
+    popup.title(f"{selectedType} - {selectedCommand}")
+    
+    # Popup visual config
+    popup.configure(
+        appearance_mode="dark",  
+        fg_color="#2a2b2e",      
+        bg_color="#2a2b2e"
+    )
+    
+    # Move popup to front of screen (modify z order of the windows)
+    popup.lift()
+    popup.attributes('-topmost', True)
+    
+    # Window size config based on window type
+    if selectedCommand in ["Delete Student", "Delete Exam", "Cancel Entry", "View Exam Schedule", ]:
+        popup.geometry("200x100") 
+    elif selectedCommand in ["Add Student", "Add New Exam", "Create Entry", "Update Grade"]:
+        popup.geometry("500x400")
+    else:
+        popup.geometry("500x350")
+        
+    mainFrame = ctk.CTkFrame(popup)
+    mainFrame.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.9, relheight=0.9)
+    
+    addWidgets(mainFrame, selectedType, selectedCommand)
+
+# Function for displaying the results
+def displayResults(results, commandName, *params):
+    # Create popup window
+    resultPopup = ctk.CTkToplevel(App)
+    resultPopup.title(f"{commandName}")
+    
+    # Add title label
+    commandLabel = ctk.CTkLabel(
+        resultPopup,
+        text=commandName,
+        font=("Inter", 14, "bold"),
+        text_color="#ffffff"
+    )
+    commandLabel.place(relx=0.5, rely=0.05, anchor="center")
+    
+    # Calculate required dimensions
+    if not results or len(results) == 0:
+        popupWidth = 400
+        popupHeight = 150
+    elif len(results) == 1 and len(results[0]) == 1:
+        # Improved sizing for single results
+        content_width = max(400, len(str(results[0][0])) * 8 + 60)
+        popupWidth = min(content_width, resultPopup.winfo_screenwidth() - 100)
+        popupHeight = 200
+    else:
+        # Calculate column widths based on content
+        colWidths = [max(len(str(row[i])) for row in results for i in range(len(results[0]))) 
+                    for i in range(len(results[0]))]
+        colWidths = [min(width * 8 + 20, 200) for width in colWidths]
+        
+        numColumns = len(results[0])
+        numRows = len(results)
+        
+        popupWidth = min(sum(colWidths) + 100, resultPopup.winfo_screenwidth() - 100)
+        popupHeight = min((40 * numRows) + 120, resultPopup.winfo_screenheight() - 100)
+        
+        popupWidth = max(popupWidth, 400)
+        popupHeight = max(popupHeight, 300)
+   
+    # Center Popup
+    screenWidth = resultPopup.winfo_screenwidth()
+    screenHeight = resultPopup.winfo_screenheight()
+    x = (screenWidth // 2) - (popupWidth // 2)
+    x = max(0, min(x, screenWidth - popupWidth))
+    y = (screenHeight // 2) - (popupHeight // 2)
+    y = max(0, min(y, screenHeight - popupHeight))
+    
+    # Window geometry
+    resultPopup.geometry(f"{int(popupWidth)}x{int(popupHeight)}+{int(x)}+{int(y)}")
+    
+    # Create main frame with scrollbar
+    mainFrame = ctk.CTkFrame(resultPopup)
+    mainFrame.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.95, relheight=0.85)
+    
+    # Create canvas and scrollbar
+    canvas = ctk.CTkCanvas(mainFrame, bg="#2a2b2e", highlightthickness=0)
+    scrollbar = ctk.CTkScrollbar(mainFrame, orientation="vertical", command=canvas.yview)
+    scrollableFrame = ctk.CTkFrame(canvas, fg_color="#2a2b2e")
+    
+    # Configure canvas scrolling
+    scrollableFrame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.create_window((0, 0), window=scrollableFrame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Pack widgets
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Handle empty results
+    if not results or len(results) == 0:
+        resultLabel = ctk.CTkLabel(scrollableFrame, text="No results found", font=("Inter", 12))
+        resultLabel.pack(pady=20)
+        return
+    
+    
+    # Create header row
+    headerFrame = ctk.CTkFrame(scrollableFrame, fg_color="#404040")
+    headerFrame.pack(fill="x", pady=(0, 10))
+    
+    # Add column headers
+    for i, column in enumerate(params if params else results[0]):
+        headerLabel = ctk.CTkLabel(headerFrame, text=str(column), font=("Inter", 11, "bold"), text_color="#ffffff", width=colWidths[i])
+        headerLabel.grid(row=0, column=i, padx=2)
+    
+    # Add data rows
+    for row in results:
+        rowFrame = ctk.CTkFrame(scrollableFrame, fg_color="#2a2b2e")
+        rowFrame.pack(fill="x", pady=2)
+       
+        for j, value in enumerate(row):
+            cellLabel = ctk.CTkLabel(rowFrame, text=str(value), font=("Inter", 11), text_color="#ffffff", width=colWidths[j])
+            cellLabel.grid(row=0, column=j, padx=2)
+                
+#Function to add widgets to the popup based on the command
+def addWidgets(frame, commandType, command):
+    for widget in frame.winfo_children():
+        widget.destroy()
+    
+    if commandType == "Student Management":
+        if command == "Add Student":
+            snoLabel = ctk.CTkLabel(frame, text="Student Number")
+            snoLabel.place(relx=0.05, rely=0.2, anchor="w")
+            snoEntry = ctk.CTkEntry(frame)
+            snoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            snameLabel = ctk.CTkLabel(frame, text="Student Name")
+            snameLabel.place(relx=0.1, rely=0.4, anchor="w")
+            snameEntry = ctk.CTkEntry(frame)
+            snameEntry.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            
+            semailLabel = ctk.CTkLabel(frame, text="Student Email")
+            semailLabel.place(relx=0.1, rely=0.6, anchor="w")
+            semailEntry = ctk.CTkEntry(frame)
+            semailEntry.place(relx=0.3, rely=0.6, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: saveStudent(snoEntry.get(), snameEntry.get(), semailEntry.get()))
+            executeButton.place(relx=0.5, rely=0.85, anchor="center")
+            
+        elif command == "Delete Student":
+            snoLabel = ctk.CTkLabel(frame, text="Student Number")
+            snoLabel.place(relx=0.05, rely=0.2, anchor="w")
+            snoEntry = ctk.CTkEntry(frame)
+            snoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: deleteStudent(snoEntry.get()))
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
+        elif command == "Search Student By Email/ID/Name":
+            searchLabel = ctk.CTkLabel(frame, text="Search Term")
+            searchLabel.place(relx=0.1, rely=0.2, anchor="w")
+            searchEntry = ctk.CTkEntry(frame)
+            searchEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            searchByLabel = ctk.CTkLabel(frame, text="Search By")
+            searchByLabel.place(relx=0.1, rely=0.4, anchor="w")
+            searchBy = ctk.CTkComboBox(frame, values=["Email", "ID", "Name"])
+            searchBy.set("ID")
+            searchBy.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: searchStudents(searchEntry.get(), searchBy.get()))
+            executeButton.place(relx=0.5, rely=0.75, anchor="center")
+            
+    elif commandType == "Exam Management":
+        if command == "Add New Exam":
+            excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
+            excodeLabel.place(relx=0.1, rely=0.2, anchor="w")
+            excodeEntry = ctk.CTkEntry(frame)
+            excodeEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            extitleLabel = ctk.CTkLabel(frame, text="Exam Title")
+            extitleLabel.place(relx=0.1, rely=0.4, anchor="w")
+            extitleEntry = ctk.CTkEntry(frame)
+            extitleEntry.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            
+            exlocationLabel = ctk.CTkLabel(frame, text="Exam Location")
+            exlocationLabel.place(relx=0.1, rely=0.6, anchor="w")
+            exlocationEntry = ctk.CTkEntry(frame)
+            exlocationEntry.place(relx=0.3, rely=0.6, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: saveExam(excodeEntry.get(), extitleEntry.get(), exlocationEntry.get()))
+            executeButton.place(relx=0.5, rely=0.85, anchor="center")
+            
+        elif command == "Delete Exam":
+            excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
+            excodeLabel.place(relx=0.1, rely=0.2, anchor="w")
+            excodeEntry = ctk.CTkEntry(frame)
+            excodeEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: deleteExam(excodeEntry.get()))
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
+        elif command == "View Exam Schedule":
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=viewExamSchedule)
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
+        elif command == "Search Exam By Title/Code":
+            searchLabel = ctk.CTkLabel(frame, text="Search Term")
+            searchLabel.place(relx=0.1, rely=0.2, anchor="w")
+            searchEntry = ctk.CTkEntry(frame)
+            searchEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            searchByLabel = ctk.CTkLabel(frame, text="Search By")
+            searchByLabel.place(relx=0.1, rely=0.4, anchor="w")
+            searchBy = ctk.CTkComboBox(frame, values=["Title", "Code"])
+            searchBy.set("Code")
+            searchBy.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: searchExams(searchEntry.get(), searchBy.get()))
+            executeButton.place(relx=0.5, rely=0.75, anchor="center")
+            
+    elif commandType == "Entry Management":
+        if command == "Create Entry":
+            snoLabel = ctk.CTkLabel(frame, text="Student Number")
+            snoLabel.place(relx=0.05, rely=0.2, anchor="w")
+            snoEntry = ctk.CTkEntry(frame)
+            snoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
+            excodeLabel.place(relx=0.1, rely=0.4, anchor="w")
+            excodeEntry = ctk.CTkEntry(frame)
+            excodeEntry.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: createEntry(snoEntry.get(), excodeEntry.get()))
+            executeButton.place(relx=0.5, rely=0.85, anchor="center")
+            
+        elif command == "Update Grade":
+            enoLabel = ctk.CTkLabel(frame, text="Entry Number")
+            enoLabel.place(relx=0.1, rely=0.2, anchor="w")
+            enoEntry = ctk.CTkEntry(frame)
+            enoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            gradeLabel = ctk.CTkLabel(frame, text="Grade")
+            gradeLabel.place(relx=0.1, rely=0.4, anchor="w")
+            gradeEntry = ctk.CTkEntry(frame)
+            gradeEntry.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: updateGrade(enoEntry.get(), gradeEntry.get()))
+            executeButton.place(relx=0.5, rely=0.85, anchor="center")
+            
+        elif command == "Cancel Entry":
+            enoLabel = ctk.CTkLabel(frame, text="Entry Number")
+            enoLabel.place(relx=0.1, rely=0.2, anchor="w")
+            enoEntry = ctk.CTkEntry(frame)
+            enoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: cancelEntry(enoEntry.get()))
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
+        elif command == "View Entries":
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=viewEntries)
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+
+
+#%% Database Execution Functions
+def saveStudent(sno, name, email):
+    try:
+        sqlCommand = "Insert into student (sno, sname, semail) values (%s, %s, %s)"
+        executeCommand(sqlCommand, False, sno, name, email)
+        messagebox.showinfo("Success", "Student added successfully!")
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to add student: {str(e)}")
+       raise
+
+def deleteStudent(sno):
+    try:
+        sqlCommand = "Delete from student where sno = %s"
+        executeCommand(sqlCommand, False, sno)
+        messagebox.showinfo("Success", "Student deleted successfully!")
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to delete student: {str(e)}")
+       raise
+    
+def searchStudents(searchTerm, searchBy):
+    try:
+        searchType = "sno"
+        if searchBy.lower() == "name":
+            searchType = "sname"
+        elif searchBy.lower() == "email":
+            searchType = "semail"
+            
+        if searchType == "sname":
+            sqlCommand = f"Select sno, sname, semail from student where {searchType} ilike %s"
+            searchTerm = f"%{searchTerm}%"
+        elif searchType == "sno":
+            sqlCommand = f"Select sno, sname, semail from student where {searchType} = %s"
+        else:
+            sqlCommand = f"Select sno, sname, semail from student where {searchType} ilike %s"
+        
+        results = executeCommand(sqlCommand, True, searchTerm)
+        
+        if not results:
+           messagebox.showerror("Error", "No students found matching the criteria")
+           return
+        
+        displayResults(results, f"Search Results ({searchBy})", "Student ID", "Name", "Email")
+        return results
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to search students: {str(e)}")
+       raise
+
+def saveExam(excode, title, location):
+    try:
+        sqlCommand = "Insert into exam (excode, extitle, exlocation) values (%s, %s, %s)"
+        executeCommand(sqlCommand, False, excode, title, location)
+        messagebox.showinfo("Success", "Exam added successfully!")
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to add exam: {str(e)}")
+       raise
+
+def deleteExam(excode):
+    try:
+        sqlCommand = "Delete from exam where excode = %s"
+        executeCommand(sqlCommand, False, excode)
+        messagebox.showinfo("Success", "Exam deleted successfully!")
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to delete exam: {str(e)}")
+       raise
+
+def searchExams(searchTerm, searchBy):
+    try:
+        sqlCommand = f"Select excode, extitle, exlocation, exdate, extime from exam where {searchBy.lower()} ilike %s"
+        searchTerm = f"%{searchTerm}%"
+        
+        results = executeCommand(sqlCommand, True, searchTerm)
+        
+        if not results:
+           messagebox.showerror("Error", "No exams found matching the criteria")
+           return
+        
+        displayResults(results, f"Search Results ({searchBy})", "Code", "Title", "Location", "Date", "Time")
+        return results
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to search exams: {str(e)}")
+       raise
+
+def createEntry(sno, excode):
+    try:
+        sqlCommand = "Insert into entry (eno, sno, excode) values ((Select coalesce(max(eno)+1, 1) from entry), %s, %s)"
+        executeCommand(sqlCommand, False, sno, excode)
+        messagebox.showinfo("Success", "Entry created successfully!")
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to create entry: {str(e)}")
+       raise
+
+def updateGrade(eno, grade):
+    try:
+        sqlCommand = "Call updateEntryGrade(%s, %s)"
+        executeCommand(sqlCommand, False, eno, grade)
+        messagebox.showinfo("Success", "Grade updated successfully!")
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to update grade: {str(e)}")
+       raise
+
+def cancelEntry(eno):
+    try:
+        sqlCommand = "Call cancelEntry(%s)"
+        executeCommand(sqlCommand, False, eno)
+        messagebox.showinfo("Success", "Entry cancelled successfully!")
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to cancel entry: {str(e)}")
+       raise
+
+def viewExamSchedule():
+    try:
+        sqlCommand = "Select excode, extitle, exlocation, exdate, extime from exam order by exdate, extime"
+        results = executeCommand(sqlCommand, True)
+        displayResults(results, "View Exam Schedule", "Code", "Title", "Location", "Date", "Time")
+        return results
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to get exam schedule: {str(e)}")
+       raise
+
+def getExamResultsForExam(examCode):
+    try:
+        sqlCommand = "Call getExamResultsForExam(%s)"
+        results = executeCommand(sqlCommand, True, examCode)
+        displayResults(results, "Exam Results", "Code", "Title", "Student ID", "Name", "Grade", "Result")
+        return results
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to get exam results: {str(e)}")
+       raise
+
+def getStudentTimetable(studentID):
+    try:
+        sqlCommand = "Call getStudentTimetable(%s)"
+        results = executeCommand(sqlCommand, True, studentID)
+        displayResults(results, "Student Timetable", "Name", "Code", "Title", "Location", "Date", "Time")
+        return results
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to get student timetable: {str(e)}")
+       raise
+
+def viewEntries():
+    try:
+        sqlCommand = "Select eno, excode, sno, egrade from entry order by eno"
+        results = executeCommand(sqlCommand, True)
+        displayResults(results, "View Entries", "ID", "Exam Code", "Student ID", "Grade")
+        return results
+    except Exception as e:
+       messagebox.showerror("Error", f"Failed to get exam schedule: {str(e)}")
+       raise
+
+#%% The GUI
+# CustomTkinter config
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("dark-blue")
+
+# Main window config
+App = ctk.CTk()
+App.geometry("800x500")
+App.title("CMPS Database")
+App.grid_columnconfigure(0, weight=1)
+App.grid_rowconfigure(1, weight=1)
+
+# Header
+headerFrame = ctk.CTkFrame(App, fg_color="#1a1b1e", corner_radius=0)
+headerFrame.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+headerFrame.grid_columnconfigure(0, weight=1)
+
+# Title
+titleLabel = ctk.CTkLabel(headerFrame, text="CMPS Database Application", text_color="#ffffff", font=("Inter", 28, "bold"), corner_radius=0)
+titleLabel.grid(row=0, column=0, pady=20, padx=40, sticky="nsew")
+
+# Input section
+# Input section card
+inputCard = ctk.CTkFrame(App, fg_color="#2a2b2e", corner_radius=10, border_width=1, border_color="#404040")
+inputCard.grid(row=1, column=0, padx=35, pady=10, sticky="nsew")
+               
+# Input card grid config
+inputCard.grid_columnconfigure(0, weight=1)
+inputCard.grid_columnconfigure(1, weight=1)
+inputCard.grid_columnconfigure(0, minsize=280)
+inputCard.grid_columnconfigure(1, minsize=280)
+
+# Dropdown for command type
+commandTypeSelect = ctk.CTkOptionMenu(inputCard, values=["Select Type", "Student Management", "Exam Management", "Entry Management"], font=("Inter", 16), command=updateCommandOptions, fg_color="#404040", button_color="#666666", button_hover_color="#808080", width=280, corner_radius=10)
+commandTypeSelect.grid(row=0, column=0, pady=(30, 10), padx=(35, 15), sticky="ew")
+
+# Dropdown for specific command
+specificCommand = ctk.CTkOptionMenu(inputCard, values=["Select Command"], font=("Inter", 16), fg_color="#404040", button_color="#666666", button_hover_color="#808080", width=280, corner_radius=10)
+specificCommand.grid(row=0, column=1, pady=(30, 10), padx=(15, 35), sticky="ew")
+
+# Instructions for use
+instructionsFrame = ctk.CTkFrame(inputCard, fg_color="#2a2b2e", bg_color="#2a2b2e", corner_radius=10, border_width=1, border_color="#404040")
+instructionsFrame.grid(row=1, column=0, columnspan=2, pady=(15, 20), padx=35, sticky="ew")
+instructionsFrame.grid_columnconfigure(0, weight=1)
+
+# Step 1
+step1Label = ctk.CTkLabel(instructionsFrame, text="1. Select the type of command you want to execute", text_color="#a0a0a0", font=("Inter", 12), corner_radius=0)
+step1Label.grid(row=0, column=0, pady=(20, 10), padx=10, sticky="w")
+
+# Step 2
+step2Label = ctk.CTkLabel(instructionsFrame, text="2. Choose a specific command from the selected category", text_color="#a0a0a0", font=("Inter", 12), corner_radius=0)
+step2Label.grid(row=1, column=0, pady=(10, 10), padx=10, sticky="w")
+
+# Step 3
+step3Label = ctk.CTkLabel(instructionsFrame, text="3. Click the Select Command button and wait for window to popup", text_color="#a0a0a0", font=("Inter", 12), corner_radius=0)
+step3Label.grid(row=2, column=0, pady=(10, 10), padx=10, sticky="w")
+
+# Step 4
+step4Label = ctk.CTkLabel(instructionsFrame, text="4. Select the desired options and input the data on the popup window and click the Execute button", text_color="#a0a0a0", font=("Inter", 12), corner_radius=0)
+step4Label.grid(row=3, column=0, pady=(10, 20), padx=10, sticky="w")
+
+# Button to select command
+actionButton = ctk.CTkButton(App, text="Select Command", command=selectedCommand, font=("Inter", 16), fg_color="#666666", hover_color="#808080", text_color="#ffffff", border_width=2, border_color="#808080", corner_radius=10, width=250, height=50)
+actionButton.grid(row=2, column=0, pady=10, padx=35)
+
+App.resizable(True, True)
+
+App.mainloop()
+#%%
