@@ -38,6 +38,7 @@ def executeCommand(command, returnType=False, *params):
     connection = None
     try:
         connection = connect()
+        connection.autocommit = True
         cur = connection.cursor()  
         cur.execute('set search_path to cmps_db')
         
@@ -67,7 +68,7 @@ def executeCommand(command, returnType=False, *params):
 # Command to define the options of the second dropdown
 def getCommands(commandType):
     commands = {
-        "Student Management": ["Add Student", "Delete Student", "Search Student By Email/ID/Name"],
+        "Student Management": ["Add Student", "Delete Student", "Search Student By Email/ID/Name", "View Students"],
         "Exam Management": ["Add New Exam", "Delete Exam", "View Exam Schedule", "Search Exam By Title/Code"],
         "Entry Management": ["Create Entry", "Cancel Entry", "Update Grade", "View Entries"]
     }
@@ -106,8 +107,10 @@ def selectedCommand():
     popup.attributes('-topmost', True)
     
     # Window size config based on window type
-    if selectedCommand in ["Delete Student", "Delete Exam", "Cancel Entry", "View Exam Schedule", ]:
+    if selectedCommand in ["View Exam Schedule", "View Students"]:
         popup.geometry("200x100") 
+    elif selectedCommand in ["Delete Student", "Delete Exam", "Cancel Entry"]:
+        popup.geometry("500x200")
     elif selectedCommand in ["Add Student", "Add New Exam", "Create Entry", "Update Grade"]:
         popup.geometry("500x400")
     else:
@@ -259,6 +262,10 @@ def addWidgets(frame, commandType, command):
             
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: searchStudents(searchEntry.get(), searchBy.get()))
             executeButton.place(relx=0.5, rely=0.75, anchor="center")
+        
+        elif command == "View Students":
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=getStudents)
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
             
     elif commandType == "Exam Management":
         if command == "Add New Exam":
@@ -358,9 +365,18 @@ def saveStudent(sno, name, email):
         executeCommand(sqlCommand, False, sno, name, email)
         messagebox.showinfo("Success", "Student added successfully!")
     except Exception as e:
-       messagebox.showerror("Error", f"Failed to add student: {str(e)}")
-       raise
-
+        messagebox.showerror("Error", f"Failed to add student: {str(e)}")
+        raise
+    
+def getStudents():
+    try:
+        sqlCommand = "Select sno, sname, semail from student order by sno"
+        results = executeCommand(sqlCommand, True)
+        displayResults(results, "View Students", "Student ID", "Name", "Email")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to show students: {str(e)}")
+        raise
+        
 def deleteStudent(sno):
     try:
         sqlCommand = "Delete from student where sno = %s"
@@ -376,24 +392,19 @@ def searchStudents(searchTerm, searchBy):
         if searchBy.lower() == "name":
             searchType = "sname"
         elif searchBy.lower() == "email":
-            searchType = "semail"
-            
+            searchType = "semail"           
         if searchType == "sname":
             sqlCommand = f"Select sno, sname, semail from student where {searchType} ilike %s"
             searchTerm = f"%{searchTerm}%"
         elif searchType == "sno":
             sqlCommand = f"Select sno, sname, semail from student where {searchType} = %s"
         else:
-            sqlCommand = f"Select sno, sname, semail from student where {searchType} ilike %s"
-        
-        results = executeCommand(sqlCommand, True, searchTerm)
-        
+            sqlCommand = f"Select sno, sname, semail from student where {searchType} ilike %s"        
+        results = executeCommand(sqlCommand, True, searchTerm)        
         if not results:
            messagebox.showerror("Error", "No students found matching the criteria")
-           return
-        
+           return        
         displayResults(results, f"Search Results ({searchBy})", "Student ID", "Name", "Email")
-        return results
     except Exception as e:
        messagebox.showerror("Error", f"Failed to search students: {str(e)}")
        raise
@@ -419,16 +430,12 @@ def deleteExam(excode):
 def searchExams(searchTerm, searchBy):
     try:
         sqlCommand = f"Select excode, extitle, exlocation, exdate, extime from exam where {searchBy.lower()} ilike %s"
-        searchTerm = f"%{searchTerm}%"
-        
-        results = executeCommand(sqlCommand, True, searchTerm)
-        
+        searchTerm = f"%{searchTerm}%"    
+        results = executeCommand(sqlCommand, True, searchTerm)    
         if not results:
            messagebox.showerror("Error", "No exams found matching the criteria")
-           return
-        
+           return  
         displayResults(results, f"Search Results ({searchBy})", "Code", "Title", "Location", "Date", "Time")
-        return results
     except Exception as e:
        messagebox.showerror("Error", f"Failed to search exams: {str(e)}")
        raise
@@ -465,7 +472,6 @@ def viewExamSchedule():
         sqlCommand = "Select excode, extitle, exlocation, exdate, extime from exam order by exdate, extime"
         results = executeCommand(sqlCommand, True)
         displayResults(results, "View Exam Schedule", "Code", "Title", "Location", "Date", "Time")
-        return results
     except Exception as e:
        messagebox.showerror("Error", f"Failed to get exam schedule: {str(e)}")
        raise
@@ -475,7 +481,6 @@ def getExamResultsForExam(examCode):
         sqlCommand = "Call getExamResultsForExam(%s)"
         results = executeCommand(sqlCommand, True, examCode)
         displayResults(results, "Exam Results", "Code", "Title", "Student ID", "Name", "Grade", "Result")
-        return results
     except Exception as e:
        messagebox.showerror("Error", f"Failed to get exam results: {str(e)}")
        raise
@@ -485,7 +490,6 @@ def getStudentTimetable(studentID):
         sqlCommand = "Call getStudentTimetable(%s)"
         results = executeCommand(sqlCommand, True, studentID)
         displayResults(results, "Student Timetable", "Name", "Code", "Title", "Location", "Date", "Time")
-        return results
     except Exception as e:
        messagebox.showerror("Error", f"Failed to get student timetable: {str(e)}")
        raise
@@ -495,7 +499,6 @@ def viewEntries():
         sqlCommand = "Select eno, excode, sno, egrade from entry order by eno"
         results = executeCommand(sqlCommand, True)
         displayResults(results, "View Entries", "ID", "Exam Code", "Student ID", "Grade")
-        return results
     except Exception as e:
        messagebox.showerror("Error", f"Failed to get exam schedule: {str(e)}")
        raise
