@@ -4,21 +4,36 @@ import customtkinter as ctk
 from tkinter import messagebox
 from dotenv import load_dotenv
 import os
+import sys
 
-# Load ENV with logging (ENV must be called database.env)
-script_dir = Path(__file__).parent.absolute()
-print(f"Script directory: {script_dir}")
-dotenv_path = script_dir / '.env'
-print(f"Looking for .env file at: {dotenv_path}")
-
-if dotenv_path.exists():
+#%% User auth
+# Function to load the env
+def loadEnv():
+    """Load environment variables with clear error messages"""
+    dotenvPath = Path(getPath(".env"))
+    
+    if not dotenvPath.exists():
+        raise FileNotFoundError("Error: .env file not found!\nPlease create a database.env file in the application directory")
     print("Found .env file, loading environment variables...")
-    load_dotenv(dotenv_path)
-else:
-    print("Error: .env file not found!")
-    raise FileNotFoundError(f".env file not found at {dotenv_path}")
+    load_dotenv(dotenvPath)
+    
+# Function to get path
+def getPath(relativePath):
+    # MEIPASS is for pyinstaller
+    try:
+        basePath = sys._MEIPASS
+    except Exception:
+        basePath = os.path.abspath(".")
 
+    return os.path.join(basePath, relativePath)
 
+# User auth run
+try:
+    loadEnv()
+except FileNotFoundError as e:
+    messagebox.showerror("Auth Error", str(e))
+    sys.exit("Failed to authenticate")
+    
 #%% Database connection and execution
 # Connect to database
 def connect():
@@ -126,12 +141,7 @@ def displayResults(results, commandName, *params):
     resultPopup.title(f"{commandName}")
     
     # Add title label
-    commandLabel = ctk.CTkLabel(
-        resultPopup,
-        text=commandName,
-        font=("Inter", 14, "bold"),
-        text_color="#ffffff"
-    )
+    commandLabel = ctk.CTkLabel(resultPopup, text=commandName, font=("Inter", 14, "bold"), text_color="#ffffff")
     commandLabel.place(relx=0.5, rely=0.05, anchor="center")
     
     # Calculate required dimensions
@@ -143,13 +153,9 @@ def displayResults(results, commandName, *params):
         popupWidth = min(content_width, resultPopup.winfo_screenwidth() - 100)
         popupHeight = 200
     else:
-        colWidths = [max(len(str(row[i])) for row in results for i in range(len(results[0]))) 
-                    for i in range(len(results[0]))]
+        colWidths = [max(len(str(row[i])) for row in results for i in range(len(results[0]))) for i in range(len(results[0]))]
         colWidths = [min(width * 8 + 20, 200) for width in colWidths]
-        
-        numColumns = len(results[0])
-        numRows = len(results)
-        
+        numRows = len(results) 
         popupWidth = min(sum(colWidths) + 100, resultPopup.winfo_screenwidth() - 100)
         popupHeight = min((40 * numRows) + 120, resultPopup.winfo_screenheight() - 100)
         
@@ -567,4 +573,3 @@ actionButton.grid(row=2, column=0, pady=10, padx=35)
 App.resizable(True, True)
 
 App.mainloop()
-#%%
