@@ -1,6 +1,4 @@
 import psycopg2
-from tkinter import *
-import tkinter as tk
 from pathlib import Path
 import customtkinter as ctk
 from tkinter import messagebox
@@ -10,7 +8,7 @@ import os
 # Load ENV with logging (ENV must be called database.env)
 script_dir = Path(__file__).parent.absolute()
 print(f"Script directory: {script_dir}")
-dotenv_path = script_dir / 'database.env'
+dotenv_path = script_dir / '.env'
 print(f"Looking for .env file at: {dotenv_path}")
 
 if dotenv_path.exists():
