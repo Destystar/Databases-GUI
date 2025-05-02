@@ -59,7 +59,7 @@ def executeCommand(command, returnType=False, *params):
     finally:
         if connection:
             connection.close()
-#%% 
+
 
 #%% GUI Management Functions
     
@@ -139,12 +139,10 @@ def displayResults(results, commandName, *params):
         popupWidth = 400
         popupHeight = 150
     elif len(results) == 1 and len(results[0]) == 1:
-        # Improved sizing for single results
         content_width = max(400, len(str(results[0][0])) * 8 + 60)
         popupWidth = min(content_width, resultPopup.winfo_screenwidth() - 100)
         popupHeight = 200
     else:
-        # Calculate column widths based on content
         colWidths = [max(len(str(row[i])) for row in results for i in range(len(results[0]))) 
                     for i in range(len(results[0]))]
         colWidths = [min(width * 8 + 20, 200) for width in colWidths]
