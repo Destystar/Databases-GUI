@@ -1,10 +1,14 @@
 import psycopg2
 from pathlib import Path
 import customtkinter as ctk
+import tkinter as tk
+from tkinter import ttk
 from tkinter import messagebox
+from tkcalendar import DateEntry
 from dotenv import load_dotenv
 import os
 import sys
+import re
 
 #%% User auth
 # Function to load the env
@@ -75,6 +79,44 @@ def executeCommand(command, returnType=False, *params):
         if connection:
             connection.close()
 
+#%% Validation Methods
+def validateTimeInput(char, timeEntry):
+    if char == "":
+        return True
+    currentText = timeEntry.get()
+    newText = currentText[:-1] + char if len(currentText) > 0 else char
+    if not re.match(r'^[\d:]$', char):
+        return False
+    if len(newText.replace(':', '')) > 6:
+        return False     
+    return True
+
+def formatTimeInput(timeEntry):
+    currentText = timeEntry.get()
+    digits = currentText.replace(':', '')
+    digits = re.sub(r'\D', '', digits)
+    
+    if len(digits) <= 2:
+        formatted = digits.zfill(2)
+    elif len(digits) <= 4:
+        formatted = f"{digits[:2]}:{digits[2:].zfill(2)}"
+    else:
+        formatted = f"{digits[:2]}:{digits[2:4].zfill(2)}:{digits[4:].zfill(2)}"
+        
+    hours = int(formatted.split(':')[0]) if ':' in formatted else int(formatted)
+    minutes = formatted.split(':')[1] if len(formatted.split(':')) > 1 else '00'
+    seconds = formatted.split(':')[2] if len(formatted.split(':')) > 2 else '00'
+    
+    if hours > 24:
+        formatted = formatted.replace(str(hours), '24', 1)
+    
+    if int(minutes) > 59:
+        formatted = formatted.replace(minutes, '59')
+    if int(seconds) > 59:
+        formatted = formatted.replace(seconds, '59')
+        
+    timeEntry.delete(0, tk.END)
+    timeEntry.insert(0, formatted)
 
 #%% GUI Management Functions
     
@@ -269,6 +311,7 @@ def addWidgets(frame, commandType, command):
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=getStudents)
             executeButton.place(relx=0.5, rely=0.65, anchor="center")
             
+            #MISSING DATE AND TIME INPUT!!!!
     elif commandType == "Exam Management":
         if command == "Add New Exam":
             excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
@@ -277,17 +320,37 @@ def addWidgets(frame, commandType, command):
             excodeEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
             
             extitleLabel = ctk.CTkLabel(frame, text="Exam Title")
-            extitleLabel.place(relx=0.1, rely=0.4, anchor="w")
+            extitleLabel.place(relx=0.1, rely=0.35, anchor="w")
             extitleEntry = ctk.CTkEntry(frame)
-            extitleEntry.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            extitleEntry.place(relx=0.3, rely=0.35, anchor="w", relwidth=0.6)
             
             exlocationLabel = ctk.CTkLabel(frame, text="Exam Location")
-            exlocationLabel.place(relx=0.1, rely=0.6, anchor="w")
+            exlocationLabel.place(relx=0.1, rely=0.5, anchor="w")
             exlocationEntry = ctk.CTkEntry(frame)
-            exlocationEntry.place(relx=0.3, rely=0.6, anchor="w", relwidth=0.6)
+            exlocationEntry.place(relx=0.3, rely=0.5, anchor="w", relwidth=0.6)
             
-            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: saveExam(excodeEntry.get(), extitleEntry.get(), exlocationEntry.get()))
-            executeButton.place(relx=0.5, rely=0.85, anchor="center")
+            exdateLabel = ctk.CTkLabel(frame, text="Exam Date")
+            exdateLabel.place(relx=0.1, rely=0.65, anchor="w")
+            style = ttk.Style()
+            style.theme_use("clam")
+            style.configure("my.DateEntry", foreground="#a0a0a0", background="#2a2b2e", fieldforeground="#a0a0a0", fieldbackground="#2a2b2e", border_width=2, arrowcolor="#404040")
+            exdateEntry = DateEntry(frame, style="my.DateEntry", width=33, font=("Inter", 20), selectmode='day', date_pattern='yyyy-mm-dd')
+            exdateEntry.pack()
+            exdateEntry.place(relx=0.3, rely=0.65, anchor="w")
+            
+            extimeLabel = ctk.CTkLabel(frame, text="Exam Time")
+            extimeLabel.place(relx=0.1, rely=0.8, anchor="w")
+            hour = tk.StringVar(value=12)
+            minute = tk.StringVar(value=00)
+            extimeEntryHour = tk.Spinbox(frame, from_=0, to=24, textvariable=hour, wrap=True, width=15, font=("Inter", 20), bg="#2a2b2e", fg="#a0a0a0", buttonbackground="#404040", highlightbackground="#404040")
+            extimeEntryHour.place(relx=0.3, rely=0.8, anchor="w")
+            colonLabel = tk.Label(frame, text=":", fg="#a0a0a0", font=("Inter", 20, "bold"), bg="#212121")
+            colonLabel.place(relx=0.58, rely=0.8, anchor="w")
+            extimeEntryMinute = tk.Spinbox(frame, from_=00, to=59, textvariable=minute, wrap=True, width=15, font=("Inter", 20), bg="#2a2b2e", fg="#a0a0a0", buttonbackground="#404040", highlightbackground="#404040", format="%02.0f")
+            extimeEntryMinute.place(relx=0.6, rely=0.8, anchor="w")
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: saveExam(excodeEntry.get(), extitleEntry.get(), exlocationEntry.get(), exdateEntry.get(), extimeEntryHour.get(), extimeEntryMinute.get()))
+            executeButton.place(relx=0.5, rely=0.9, anchor="center")
             
         elif command == "Delete Exam":
             excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
@@ -411,10 +474,11 @@ def searchStudents(searchTerm, searchBy):
        messagebox.showerror("Error", f"Failed to search students: {str(e)}")
        raise
 
-def saveExam(excode, title, location):
+def saveExam(excode, title, location, date, hour, minute):
     try:
-        sqlCommand = "Insert into exam (excode, extitle, exlocation) values (%s, %s, %s)"
-        executeCommand(sqlCommand, False, excode, title, location)
+        time = f"{hour:02d}:{minute:02d}:00"
+        sqlCommand = "Insert into exam (excode, extitle, exlocation, exdate, extime) values (%s, %s, %s, %s, %s)"
+        executeCommand(sqlCommand, False, excode, title, location, date, time)
         messagebox.showinfo("Success", "Exam added successfully!")
     except Exception as e:
        messagebox.showerror("Error", f"Failed to add exam: {str(e)}")
