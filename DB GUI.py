@@ -162,7 +162,7 @@ def selectedCommand():
     popup.attributes('-topmost', True)
     
     # Window size config based on window type
-    if selectedCommand in ["View Exam Schedule", "View Students"]:
+    if selectedCommand in ["View Exam Schedule", "View Students", "View Entries"]:
         popup.geometry("200x100") 
     elif selectedCommand in ["Delete Student", "Delete Exam", "Cancel Entry"]:
         popup.geometry("500x200")
@@ -476,7 +476,7 @@ def searchStudents(searchTerm, searchBy):
 
 def saveExam(excode, title, location, date, hour, minute):
     try:
-        time = f"{hour:02d}:{minute:02d}:00"
+        time = f"{hour}:{minute}:00"
         sqlCommand = "Insert into exam (excode, extitle, exlocation, exdate, extime) values (%s, %s, %s, %s, %s)"
         executeCommand(sqlCommand, False, excode, title, location, date, time)
         messagebox.showinfo("Success", "Exam added successfully!")
@@ -495,6 +495,10 @@ def deleteExam(excode):
 
 def searchExams(searchTerm, searchBy):
     try:
+        if searchBy == "Code":
+            searchBy = "excode"
+        elif searchBy == "Title":
+            searchBy = "extitle"
         sqlCommand = f"Select excode, extitle, exlocation, exdate, extime from exam where {searchBy.lower()} ilike %s"
         searchTerm = f"%{searchTerm}%"    
         results = executeCommand(sqlCommand, True, searchTerm)    
