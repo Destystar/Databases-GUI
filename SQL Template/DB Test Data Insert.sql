@@ -46,5 +46,5 @@ Insert into entry (eno, excode, sno, egrade) values
 
 -- Insert sample cancelled entries
 Insert into cancel (eno, excode, sno, cdate, cuser) values
-    (1001, 'DB01', 001, '2025-11-01 10:00:00', 'admin'),
-    (1003, 'MT03', 002, '2025-11-02 14:30:00', 'system');
+    (1016, 'DB01', 002, '2025-11-01 10:00:00', 'system'),
+    (1017, 'MT03', 005, '2025-11-02 14:30:00', 'system');

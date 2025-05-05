@@ -310,8 +310,7 @@ def addWidgets(frame, commandType, command):
         elif command == "View Students":
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=getStudents)
             executeButton.place(relx=0.5, rely=0.65, anchor="center")
-            
-            #MISSING DATE AND TIME INPUT!!!!
+                        
     elif commandType == "Exam Management":
         if command == "Add New Exam":
             excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
@@ -521,7 +520,8 @@ def createEntry(sno, excode):
 
 def updateGrade(eno, grade):
     try:
-        sqlCommand = "Call updateEntryGrade(%s, %s)"
+        grade = "{:02.2f}".format(float(grade))
+        sqlCommand = "Select updateEntryGrade(%s, %s)"
         executeCommand(sqlCommand, False, eno, grade)
         messagebox.showinfo("Success", "Grade updated successfully!")
     except Exception as e:
@@ -530,7 +530,7 @@ def updateGrade(eno, grade):
 
 def cancelEntry(eno):
     try:
-        sqlCommand = "Call cancelEntry(%s)"
+        sqlCommand = "Select cancelEntry(%s)"
         executeCommand(sqlCommand, False, eno)
         messagebox.showinfo("Success", "Entry cancelled successfully!")
     except Exception as e:
@@ -548,7 +548,7 @@ def viewExamSchedule():
 
 def getExamResultsForExam(examCode):
     try:
-        sqlCommand = "Call getExamResultsForExam(%s)"
+        sqlCommand = "Select getExamResultsForExam(%s)"
         results = executeCommand(sqlCommand, True, examCode)
         displayResults(results, "Exam Results", "Code", "Title", "Student ID", "Name", "Grade", "Result")
     except Exception as e:
@@ -557,7 +557,7 @@ def getExamResultsForExam(examCode):
 
 def getStudentTimetable(studentID):
     try:
-        sqlCommand = "Call getStudentTimetable(%s)"
+        sqlCommand = "Select getStudentTimetable(%s)"
         results = executeCommand(sqlCommand, True, studentID)
         displayResults(results, "Student Timetable", "Name", "Code", "Title", "Location", "Date", "Time")
     except Exception as e:

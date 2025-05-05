@@ -94,7 +94,7 @@ Begin
     End if;
 
     -- Checks for same-day exam bookings (collisions)
-    If exists (select 1 from entry e join exam ex on e.excode = ex.excode where e.sno = new.sno and ex.exdate = (select exdate from exam where excode = new.excode) then
+    If exists (select 1 from entry e join exam ex on e.excode = ex.excode where e.sno = new.sno and ex.exdate = (select exdate from exam where excode = new.excode)) then
         Raise exception 'Student already has an exam scheduled for this date';
     End if;
 
@@ -103,15 +103,15 @@ End;
 $$ language plpgsql;
 
 -- Function to update an entry
-Create or replace function updateEntryGrade(eno integer, grade decimal(5,2)) returns void as $$
+Create or replace function updateEntryGrade(enoInput integer, grade decimal(5,2)) returns void as $$
 Begin
     -- Check if the entry exists
-    If not exists (select 1 from entry e where e.eno = eno) then
+    If not exists (select 1 from entry e where e.eno = enoInput) then
         Raise exception 'Entry does not exist';
     End if;
 
     -- Check if the entry is cancelled
-    If exists (select 1 from cancel c where c.eno = eno) then
+    If exists (select 1 from cancel c where c.eno = enoInput) then
         Raise exception 'Cannot update a cancelled entry';
     End if;
 
@@ -120,7 +120,7 @@ Begin
         Raise exception 'Grade must be between 0 and 100';
     End if;
 
-    Update entry set egrade = grade where eno = eno;
+    Update entry set egrade = grade where eno = enoInput;
 End;
 $$ language plpgsql;
 
@@ -218,6 +218,6 @@ Order by e.excode, s.sname;
 -- Indexes
 
 -- Index for
-Create index idndexStudentSname on student(sname);
-Create index idnexExamExtitle on exam(extitle);
-Create index idndexEntrySno on entry(sno);
+Create index indexStudentSname on student(sname);
+Create index indexExamExtitle on exam(extitle);
+Create index inddexEntrySno on entry(sno);
