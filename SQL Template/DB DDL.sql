@@ -147,13 +147,13 @@ Begin
                 When en.egrade >= 70 then 'Distinction'
                 When en.egrade >= 50 then 'Pass'
                 Else 'Fail'
-            End as VARCHAR(200)
+            End as varchar(20)
         ) As resultText
     From exam e
     Left join entry en on e.excode = en.excode
-    Left join student s on en.sno = s.sno
+	Left join student s on en.sno = s.sno
     Where e.excode = examCode
-    Order by s.sname;
+    Order by s.sno;
 End;
 $$ language plpgsql;
 

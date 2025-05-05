@@ -575,7 +575,8 @@ def viewExamSchedule():
 
 def getResultsForExam(examCode):
     try:
-        sqlCommand = "Select getResultsForExam(%s)"
+        examCode = examCode.upper()
+        sqlCommand = "Select * from getResultsForExam(%s)"
         results = executeCommand(sqlCommand, True, examCode)
         displayResults(results, "Exam Results", "Code", "Title", "Student ID", "Name", "Grade", "Result")
     except Exception as e:
