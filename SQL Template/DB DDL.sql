@@ -37,7 +37,6 @@ Create table cancel (
 	sno integer not null unique,
 	cdate timestamp not null default current_timestamp,
 	cuser varchar(200) not null,
-	foreign key (eno) references entry(eno),
 	foreign key (excode) references exam(excode),
 	foreign key (sno) references student(sno)
 );
@@ -50,7 +49,7 @@ Begin
 	 If not exists (select 1 from entry where eno = entryID) then
         Raise exception 'Entry does not exist';
     End if;
-	Insert into cancel (eno, excode, sno, cuser) select eno, excode, sno, 'system' from entry where eno = entryID;
+	Insert into cancel (eno, excode, sno, cdate, cuser) select eno, excode, sno, current_timestamp, 'system' from entry where eno = entryID;
 	Delete from entry where eno = entryID;
 End;
 $$ language plpgsql;
@@ -125,7 +124,7 @@ End;
 $$ language plpgsql;
 
 -- Function to get table of results for a specific exam
-Create or replace function getExamResultsForExam(examCode char(4))
+Create or replace function getResultsForExam(examCode char(4))
 Returns table (
     excode char(4),
     extitle varchar(200),
@@ -142,12 +141,14 @@ Begin
         s.sno,
         s.sname,
         en.egrade,
-        Case
-            When en.egrade is null then 'Not taken'
-            When en.egrade >= 70 then 'Distinction'
-            When en.egrade >= 50 then 'Pass'
-            Else 'Fail'
-        End as resultText
+		Cast(
+            Case
+                When en.egrade is null then 'Not taken'
+                When en.egrade >= 70 then 'Distinction'
+                When en.egrade >= 50 then 'Pass'
+                Else 'Fail'
+            End as VARCHAR(200)
+        ) As resultText
     From exam e
     Left join entry en on e.excode = en.excode
     Left join student s on en.sno = s.sno
@@ -179,9 +180,13 @@ Begin
     Join entry en on s.sno = en.sno
     Join exam e on en.excode = e.excode
     Where s.sno = studentID
+    And not exists (
+        select 1 from cancel c 
+        Where c.eno = en.eno
+    )
     Order by e.exdate, e.extime;
 End;
-$$ language plpgsql;
+$$ Language plpgsql;
 
 -- Triggers
 

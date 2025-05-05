@@ -123,9 +123,9 @@ def formatTimeInput(timeEntry):
 # Command to define the options of the second dropdown
 def getCommands(commandType):
     commands = {
-        "Student Management": ["Add Student", "Delete Student", "Search Student By Email/ID/Name", "View Students"],
-        "Exam Management": ["Add New Exam", "Delete Exam", "View Exam Schedule", "Search Exam By Title/Code"],
-        "Entry Management": ["Create Entry", "Cancel Entry", "Update Grade", "View Entries"]
+        "Student Management": ["Add Student", "Delete Student", "Search Student By Email/ID/Name", "View Students", "View Student Timetable"],
+        "Exam Management": ["Add New Exam", "Delete Exam", "View Exam Schedule", "Search Exam By Title/Code", "View Results For Exam"],
+        "Entry Management": ["Create Entry", "Cancel Entry", "Update Grade", "View Entries", "View Cancelled Entries"]
     }
     return commands.get(commandType, [""])
 
@@ -162,9 +162,9 @@ def selectedCommand():
     popup.attributes('-topmost', True)
     
     # Window size config based on window type
-    if selectedCommand in ["View Exam Schedule", "View Students", "View Entries"]:
+    if selectedCommand in ["View Exam Schedule", "View Students", "View Entries", "View Cancelled Entries"]:
         popup.geometry("200x100") 
-    elif selectedCommand in ["Delete Student", "Delete Exam", "Cancel Entry"]:
+    elif selectedCommand in ["Delete Student", "Delete Exam", "Cancel Entry", "View Results For Exam", "View Student Timetable"]:
         popup.geometry("500x200")
     elif selectedCommand in ["Add Student", "Add New Exam", "Create Entry", "Update Grade"]:
         popup.geometry("500x400")
@@ -310,6 +310,15 @@ def addWidgets(frame, commandType, command):
         elif command == "View Students":
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=getStudents)
             executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
+        elif command == "View Student Timetable":
+            snoLabel = ctk.CTkLabel(frame, text="Student Number")
+            snoLabel.place(relx=0.05, rely=0.2, anchor="w")
+            snoEntry = ctk.CTkEntry(frame)
+            snoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: getStudentTimetable(snoEntry.get()))
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
                         
     elif commandType == "Exam Management":
         if command == "Add New Exam":
@@ -379,17 +388,31 @@ def addWidgets(frame, commandType, command):
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: searchExams(searchEntry.get(), searchBy.get()))
             executeButton.place(relx=0.5, rely=0.75, anchor="center")
             
+        elif command == "View Results For Exam":
+            excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
+            excodeLabel.place(relx=0.1, rely=0.2, anchor="w")
+            excodeEntry = ctk.CTkEntry(frame)
+            excodeEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: getResultsForExam(excodeEntry.get()))
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
     elif commandType == "Entry Management":
         if command == "Create Entry":
+            enoLabel = ctk.CTkLabel(frame, text="Entry ID")
+            enoLabel.place(relx=0.05, rely=0.2, anchor="w")
+            enoEntry = ctk.CTkEntry(frame)
+            enoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            
             snoLabel = ctk.CTkLabel(frame, text="Student Number")
-            snoLabel.place(relx=0.05, rely=0.2, anchor="w")
+            snoLabel.place(relx=0.05, rely=0.4, anchor="w")
             snoEntry = ctk.CTkEntry(frame)
-            snoEntry.place(relx=0.3, rely=0.2, anchor="w", relwidth=0.6)
+            snoEntry.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
             
             excodeLabel = ctk.CTkLabel(frame, text="Exam Code")
-            excodeLabel.place(relx=0.1, rely=0.4, anchor="w")
+            excodeLabel.place(relx=0.1, rely=0.6, anchor="w")
             excodeEntry = ctk.CTkEntry(frame)
-            excodeEntry.place(relx=0.3, rely=0.4, anchor="w", relwidth=0.6)
+            excodeEntry.place(relx=0.3, rely=0.6, anchor="w", relwidth=0.6)
             
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: createEntry(snoEntry.get(), excodeEntry.get()))
             executeButton.place(relx=0.5, rely=0.85, anchor="center")
@@ -419,6 +442,10 @@ def addWidgets(frame, commandType, command):
             
         elif command == "View Entries":
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=viewEntries)
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
+        elif command == "View Cancelled Entries":
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=viewCancelledEntries)
             executeButton.place(relx=0.5, rely=0.65, anchor="center")
 
 
@@ -509,10 +536,10 @@ def searchExams(searchTerm, searchBy):
        messagebox.showerror("Error", f"Failed to search exams: {str(e)}")
        raise
 
-def createEntry(sno, excode):
+def createEntry(eno, sno, excode):
     try:
-        sqlCommand = "Insert into entry (eno, sno, excode) values ((Select coalesce(max(eno)+1, 1) from entry), %s, %s)"
-        executeCommand(sqlCommand, False, sno, excode)
+        sqlCommand = "Insert into entry (eno, sno, excode) values (%s, %s, %s)"
+        executeCommand(sqlCommand, False, eno, sno, excode)
         messagebox.showinfo("Success", "Entry created successfully!")
     except Exception as e:
        messagebox.showerror("Error", f"Failed to create entry: {str(e)}")
@@ -546,9 +573,9 @@ def viewExamSchedule():
        messagebox.showerror("Error", f"Failed to get exam schedule: {str(e)}")
        raise
 
-def getExamResultsForExam(examCode):
+def getResultsForExam(examCode):
     try:
-        sqlCommand = "Select getExamResultsForExam(%s)"
+        sqlCommand = "Select getResultsForExam(%s)"
         results = executeCommand(sqlCommand, True, examCode)
         displayResults(results, "Exam Results", "Code", "Title", "Student ID", "Name", "Grade", "Result")
     except Exception as e:
@@ -557,7 +584,7 @@ def getExamResultsForExam(examCode):
 
 def getStudentTimetable(studentID):
     try:
-        sqlCommand = "Select getStudentTimetable(%s)"
+        sqlCommand = "Select * from getStudentTimetable(%s)"
         results = executeCommand(sqlCommand, True, studentID)
         displayResults(results, "Student Timetable", "Name", "Code", "Title", "Location", "Date", "Time")
     except Exception as e:
@@ -570,8 +597,17 @@ def viewEntries():
         results = executeCommand(sqlCommand, True)
         displayResults(results, "View Entries", "ID", "Exam Code", "Student ID", "Grade")
     except Exception as e:
-       messagebox.showerror("Error", f"Failed to get exam schedule: {str(e)}")
+       messagebox.showerror("Error", f"Failed to get Entries: {str(e)}")
        raise
+       
+def viewCancelledEntries():
+    try:
+        sqlCommand = "Select eno, excode, sno, cdate, cuser from cancel order by eno"
+        results = executeCommand(sqlCommand, True)
+        displayResults(results, "View Cancelled Entries", "ID", "Exam Code", "Student ID", "Grade", "Cancelled By")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to get Cancelled Entries: {str(e)}")
+        raise
 
 #%% The GUI
 # CustomTkinter config
