@@ -36,8 +36,7 @@ Create table cancel (
 	excode char(4) not null unique,
 	sno integer not null,
 	cdate timestamp not null default current_timestamp,
-	cuser varchar(200) not null,
-	foreign key (excode) references exam(excode)
+	cuser varchar(200) not null
 );
 
 -- Functions
