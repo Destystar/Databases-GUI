@@ -124,7 +124,7 @@ def formatTimeInput(timeEntry):
 def getCommands(commandType):
     commands = {
         "Student Management": ["Add Student", "Delete Student", "Search Student By Email/ID/Name", "View Students", "View Student Timetable"],
-        "Exam Management": ["Add New Exam", "Delete Exam", "View Exam Schedule", "Search Exam By Title/Code", "View Results For Exam"],
+        "Exam Management": ["Add New Exam", "Delete Exam", "View Exam Schedule", "Search Exam By Title/Code", "View Results For Exam", "View All Results"],
         "Entry Management": ["Create Entry", "Cancel Entry", "Update Grade", "View Entries", "View Cancelled Entries"]
     }
     return commands.get(commandType, [""])
@@ -162,7 +162,7 @@ def selectedCommand():
     popup.attributes('-topmost', True)
     
     # Window size config based on window type
-    if selectedCommand in ["View Exam Schedule", "View Students", "View Entries", "View Cancelled Entries"]:
+    if selectedCommand in ["View Exam Schedule", "View Students", "View Entries", "View Cancelled Entries", "View All Results"]:
         popup.geometry("200x100") 
     elif selectedCommand in ["Delete Student", "Delete Exam", "Cancel Entry", "View Results For Exam", "View Student Timetable"]:
         popup.geometry("500x200")
@@ -397,6 +397,10 @@ def addWidgets(frame, commandType, command):
             executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: getResultsForExam(excodeEntry.get()))
             executeButton.place(relx=0.5, rely=0.65, anchor="center")
             
+        elif command == "View All Results":
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=allResults)
+            executeButton.place(relx=0.5, rely=0.65, anchor="center")
+            
     elif commandType == "Entry Management":
         if command == "Create Entry":
             enoLabel = ctk.CTkLabel(frame, text="Entry ID")
@@ -461,7 +465,7 @@ def saveStudent(sno, name, email):
     
 def getStudents():
     try:
-        sqlCommand = "Select sno, sname, semail from student order by sno"
+        sqlCommand = "Select * from student order by sno"
         results = executeCommand(sqlCommand, True)
         displayResults(results, "View Students", "Student ID", "Name", "Email")
     except Exception as e:
@@ -485,12 +489,12 @@ def searchStudents(searchTerm, searchBy):
         elif searchBy.lower() == "email":
             searchType = "semail"           
         if searchType == "sname":
-            sqlCommand = f"Select sno, sname, semail from student where {searchType} ilike %s"
+            sqlCommand = f"Select * from student where {searchType} ilike %s"
             searchTerm = f"%{searchTerm}%"
         elif searchType == "sno":
-            sqlCommand = f"Select sno, sname, semail from student where {searchType} = %s"
+            sqlCommand = f"Select * from student where {searchType} = %s"
         else:
-            sqlCommand = f"Select sno, sname, semail from student where {searchType} ilike %s"        
+            sqlCommand = f"Select * from student where {searchType} ilike %s"        
         results = executeCommand(sqlCommand, True, searchTerm)        
         if not results:
            messagebox.showerror("Error", "No students found matching the criteria")
@@ -566,7 +570,7 @@ def cancelEntry(eno):
 
 def viewExamSchedule():
     try:
-        sqlCommand = "Select excode, extitle, exlocation, exdate, extime from exam order by exdate, extime"
+        sqlCommand = "Select * from exam order by exdate, extime"
         results = executeCommand(sqlCommand, True)
         displayResults(results, "View Exam Schedule", "Code", "Title", "Location", "Date", "Time")
     except Exception as e:
@@ -594,7 +598,7 @@ def getStudentTimetable(studentID):
 
 def viewEntries():
     try:
-        sqlCommand = "Select eno, excode, sno, egrade from entry order by eno"
+        sqlCommand = "Select * from entry order by eno"
         results = executeCommand(sqlCommand, True)
         displayResults(results, "View Entries", "ID", "Exam Code", "Student ID", "Grade")
     except Exception as e:
@@ -603,11 +607,20 @@ def viewEntries():
        
 def viewCancelledEntries():
     try:
-        sqlCommand = "Select eno, excode, sno, cdate, cuser from cancel order by eno"
+        sqlCommand = "Select * from cancel order by eno"
         results = executeCommand(sqlCommand, True)
         displayResults(results, "View Cancelled Entries", "ID", "Exam Code", "Student ID", "Grade", "Cancelled By")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to get Cancelled Entries: {str(e)}")
+        raise
+        
+def allResults():
+    try:
+        sqlCommand = "Select * from examResults"
+        results = executeCommand(sqlCommand, True)
+        displayResults(results, "View All Results", "Exam ID", "Exam Title", "Student ID", "Student Name", "Score", "Grade")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to get Exam Results: {str(e)}")
         raise
 
 #%% The GUI
