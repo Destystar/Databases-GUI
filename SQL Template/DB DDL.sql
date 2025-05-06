@@ -24,7 +24,7 @@ Create table student (
 Create table entry (
 	eno integer primary key,
 	excode char(4) not null,
-	sno integer not null unique,
+	sno integer not null,
 	egrade decimal(5,2) check (egrade is null or egrade between 0 and 100),
 	foreign key (excode) references exam(excode),
 	foreign key (sno) references student(sno)
