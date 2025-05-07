@@ -33,7 +33,7 @@ Create table entry (
 -- Defines the cancel table
 Create table cancel (
 	eno integer primary key,
-	excode char(4) not null unique,
+	excode char(4) not null,
 	sno integer not null,
 	cdate timestamp not null default current_timestamp,
 	cuser varchar(200) not null
