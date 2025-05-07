@@ -418,7 +418,7 @@ def addWidgets(frame, commandType, command):
             excodeEntry = ctk.CTkEntry(frame)
             excodeEntry.place(relx=0.3, rely=0.6, anchor="w", relwidth=0.6)
             
-            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: createEntry(snoEntry.get(), excodeEntry.get()))
+            executeButton = ctk.CTkButton(frame, text="EXECUTE", command=lambda: createEntry(enoEntry.get(), snoEntry.get(), excodeEntry.get()))
             executeButton.place(relx=0.5, rely=0.85, anchor="center")
             
         elif command == "Update Grade":
@@ -609,7 +609,7 @@ def viewCancelledEntries():
     try:
         sqlCommand = "Select * from cancel order by eno"
         results = executeCommand(sqlCommand, True)
-        displayResults(results, "View Cancelled Entries", "ID", "Exam Code", "Student ID", "Grade", "Cancelled By")
+        displayResults(results, "View Cancelled Entries", "ID", "Exam Code", "Student ID", "Cancel Timestamp", "Cancelled By")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to get Cancelled Entries: {str(e)}")
         raise
