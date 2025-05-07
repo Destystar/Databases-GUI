@@ -201,7 +201,7 @@ def displayResults(results, commandName, *params):
         popupWidth = min(sum(colWidths) + 100, resultPopup.winfo_screenwidth() - 100)
         popupHeight = min((40 * numRows) + 120, resultPopup.winfo_screenheight() - 100)
         
-        popupWidth = max(popupWidth, 400)
+        popupWidth = max(popupWidth, 200)
         popupHeight = max(popupHeight, 300)
    
     # Center Popup
